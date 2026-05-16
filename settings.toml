@@ -1,0 +1,10 @@
+[normal]
+speed = 10
+enhance_precision = true
+
+[gaming]
+speed = 4
+enhance_precision = false
+
+[hotkey]
+toggle = "Ctrl+Alt+M"
