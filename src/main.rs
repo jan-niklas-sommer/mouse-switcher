@@ -187,10 +187,13 @@ fn main() {
 
     {
         let mut a = app.borrow_mut();
+        let toggle = a.config.hotkey.toggle.clone();
+        let speed_up = a.config.hotkey.speed_up.clone();
+        let speed_down = a.config.hotkey.speed_down.clone();
         a.log("Mouse Switcher started.");
-        a.log(&format!("  Toggle: {}", a.config.hotkey.toggle));
-        a.log(&format!("  Speed Up: {}", a.config.hotkey.speed_up));
-        a.log(&format!("  Speed Down: {}", a.config.hotkey.speed_down));
+        a.log(&format!("  Toggle: {}", toggle));
+        a.log(&format!("  Speed Up: {}", speed_up));
+        a.log(&format!("  Speed Down: {}", speed_down));
     }
 
     run_event_loop(app);
