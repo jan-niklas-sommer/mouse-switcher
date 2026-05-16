@@ -1,8 +1,12 @@
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+
 mod config;
 mod mouse;
 mod tray;
 
 use std::cell::RefCell;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -26,32 +30,143 @@ struct App {
     hotkey_toggle_id: u32,
     hotkey_speed_up_id: u32,
     hotkey_speed_down_id: u32,
+    log_file: Option<std::fs::File>,
+}
+
+impl App {
+    fn log(&mut self, msg: &str) {
+        if let Some(ref mut f) = self.log_file {
+            let _ = writeln!(f, "{}", msg);
+        }
+    }
+}
+
+fn open_log_file() -> Option<std::fs::File> {
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    let log_path = exe_dir.join("mouse-switcher.log");
+    OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+        .ok()
+}
+
+fn parse_hotkey(s: &str) -> Option<global_hotkey::hotkey::HotKey> {
+    if let Ok(h) = global_hotkey::hotkey::HotKey::from_str(s) {
+        return Some(h);
+    }
+    let fallback = match s.to_lowercase().as_str() {
+        s if s.contains("arrowup") || s.contains("up") => s
+            .to_lowercase()
+            .replace("arrowup", "Plus")
+            .replace("up", "Plus"),
+        s if s.contains("arrowdown") || s.contains("down") => s
+            .to_lowercase()
+            .replace("arrowdown", "Minus")
+            .replace("down", "Minus"),
+        _ => return None,
+    };
+    global_hotkey::hotkey::HotKey::from_str(&fallback).ok()
 }
 
 fn main() {
-    let config = Config::load().expect("Failed to load config. Delete settings.toml to reset.");
+    let mut log_file = open_log_file();
+    if let Some(ref mut f) = log_file {
+        let _ = writeln!(f, "=== Mouse Switcher starting ===");
+    }
 
-    apply_settings(&config.normal.clone().into()).expect("Failed to apply initial profile");
+    let config = match Config::load() {
+        Ok(c) => c,
+        Err(e) => {
+            if let Some(ref mut f) = log_file {
+                let _ = writeln!(f, "FATAL: {}", e);
+            }
+            show_error(&format!("Failed to load config: {}", e));
+            return;
+        }
+    };
 
-    let app_tray = tray::build_tray().expect("Failed to create tray icon");
+    if let Err(e) = apply_settings(&config.normal.clone().into()) {
+        if let Some(ref mut f) = log_file {
+            let _ = writeln!(f, "WARN: Failed to apply initial profile: {}", e);
+        }
+    }
 
-    let hotkey_manager =
-        global_hotkey::GlobalHotKeyManager::new().expect("Failed to create hotkey manager");
+    let app_tray = match tray::build_tray() {
+        Ok(t) => t,
+        Err(e) => {
+            if let Some(ref mut f) = log_file {
+                let _ = writeln!(f, "FATAL: Failed to create tray: {}", e);
+            }
+            show_error(&format!("Failed to create tray icon: {}", e));
+            return;
+        }
+    };
 
-    let hotkey_toggle = global_hotkey::hotkey::HotKey::from_str(&config.hotkey.toggle)
-        .expect("Failed to parse toggle hotkey");
-    let hotkey_speed_up = global_hotkey::hotkey::HotKey::from_str(&config.hotkey.speed_up)
-        .expect("Failed to parse speed_up hotkey");
-    let hotkey_speed_down = global_hotkey::hotkey::HotKey::from_str(&config.hotkey.speed_down)
-        .expect("Failed to parse speed_down hotkey");
+    let hotkey_manager = match global_hotkey::GlobalHotKeyManager::new() {
+        Ok(m) => m,
+        Err(e) => {
+            if let Some(ref mut f) = log_file {
+                let _ = writeln!(f, "FATAL: Failed to create hotkey manager: {}", e);
+            }
+            show_error(&format!("Failed to create hotkey manager: {}", e));
+            return;
+        }
+    };
+
+    let hotkey_toggle = match parse_hotkey(&config.hotkey.toggle) {
+        Some(h) => h,
+        None => {
+            if let Some(ref mut f) = log_file {
+                let _ = writeln!(f, "WARN: Failed to parse toggle hotkey: {}", config.hotkey.toggle);
+            }
+            show_error(&format!(
+                "Failed to parse hotkey '{}'. Edit settings.toml.",
+                config.hotkey.toggle
+            ));
+            return;
+        }
+    };
+
+    let hotkey_speed_up = match parse_hotkey(&config.hotkey.speed_up) {
+        Some(h) => h,
+        None => {
+            if let Some(ref mut f) = log_file {
+                let _ = writeln!(f, "WARN: Failed to parse speed_up hotkey: {}", config.hotkey.speed_up);
+            }
+            global_hotkey::hotkey::HotKey::from_str("Ctrl+Alt+Plus").unwrap()
+        }
+    };
+
+    let hotkey_speed_down = match parse_hotkey(&config.hotkey.speed_down) {
+        Some(h) => h,
+        None => {
+            if let Some(ref mut f) = log_file {
+                let _ = writeln!(f, "WARN: Failed to parse speed_down hotkey: {}", config.hotkey.speed_down);
+            }
+            global_hotkey::hotkey::HotKey::from_str("Ctrl+Alt+Minus").unwrap()
+        }
+    };
 
     let hotkey_toggle_id = hotkey_toggle.id();
     let hotkey_speed_up_id = hotkey_speed_up.id();
     let hotkey_speed_down_id = hotkey_speed_down.id();
 
-    hotkey_manager.register(hotkey_toggle).expect("Failed to register toggle hotkey");
-    hotkey_manager.register(hotkey_speed_up).expect("Failed to register speed_up hotkey");
-    hotkey_manager.register(hotkey_speed_down).expect("Failed to register speed_down hotkey");
+    if let Err(e) = hotkey_manager.register(hotkey_toggle) {
+        if let Some(ref mut f) = log_file {
+            let _ = writeln!(f, "WARN: Failed to register toggle hotkey: {}", e);
+        }
+    }
+    if let Err(e) = hotkey_manager.register(hotkey_speed_up) {
+        if let Some(ref mut f) = log_file {
+            let _ = writeln!(f, "WARN: Failed to register speed_up hotkey: {}", e);
+        }
+    }
+    if let Err(e) = hotkey_manager.register(hotkey_speed_down) {
+        if let Some(ref mut f) = log_file {
+            let _ = writeln!(f, "WARN: Failed to register speed_down hotkey: {}", e);
+        }
+    }
 
     tray::update_tray_ui(
         &app_tray,
@@ -67,16 +182,53 @@ fn main() {
         hotkey_toggle_id,
         hotkey_speed_up_id,
         hotkey_speed_down_id,
+        log_file,
     }));
 
-    println!("Mouse Switcher started.");
     {
-        let a = app.borrow();
-        println!("  Toggle: {}", a.config.hotkey.toggle);
-        println!("  Speed Up: {}", a.config.hotkey.speed_up);
-        println!("  Speed Down: {}", a.config.hotkey.speed_down);
+        let mut a = app.borrow_mut();
+        a.log("Mouse Switcher started.");
+        a.log(&format!("  Toggle: {}", a.config.hotkey.toggle));
+        a.log(&format!("  Speed Up: {}", a.config.hotkey.speed_up));
+        a.log(&format!("  Speed Down: {}", a.config.hotkey.speed_down));
     }
 
+    run_event_loop(app);
+}
+
+#[cfg(target_os = "windows")]
+fn run_event_loop(app: Rc<RefCell<App>>) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        DispatchMessageW, GetMessageW, TranslateMessage, MSG,
+    };
+
+    let hotkey_rx = global_hotkey::GlobalHotKeyEvent::receiver();
+    let menu_rx = tray_icon::menu::MenuEvent::receiver();
+
+    let mut msg = MSG::default();
+
+    loop {
+        unsafe {
+            if GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                let _ = TranslateMessage(&msg);
+                let _ = DispatchMessageW(&msg);
+            }
+        }
+
+        if let Ok(event) = hotkey_rx.try_recv() {
+            if event.state == global_hotkey::HotKeyState::Pressed {
+                handle_hotkey(&app, event.id);
+            }
+        }
+
+        if let Ok(event) = menu_rx.try_recv() {
+            handle_menu_event(&app, event);
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn run_event_loop(app: Rc<RefCell<App>>) {
     let hotkey_rx = global_hotkey::GlobalHotKeyEvent::receiver();
     let menu_rx = tray_icon::menu::MenuEvent::receiver();
 
@@ -96,6 +248,27 @@ fn main() {
             }
         }
     }
+}
+
+#[cfg(target_os = "windows")]
+fn show_error(msg: &str) {
+    use windows::core::PCWSTR;
+    use windows::Win32::UI::WindowsAndMessaging::MessageBoxW;
+    let wide: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
+    let title: Vec<u16> = "Mouse Switcher Error\0".encode_utf16().collect();
+    unsafe {
+        let _ = MessageBoxW(
+            None,
+            PCWSTR(wide.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            windows::Win32::UI::WindowsAndMessaging::MB_ICONERROR,
+        );
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn show_error(msg: &str) {
+    eprintln!("ERROR: {}", msg);
 }
 
 fn refresh_ui(app: &Rc<RefCell<App>>) {
@@ -140,7 +313,10 @@ fn handle_menu_event(app: &Rc<RefCell<App>>, event: tray_icon::menu::MenuEvent) 
     } else if tray::is_open_config(&event.id) {
         tray::open_config_file();
     } else if tray::is_quit(&event.id) {
-        println!("Quitting Mouse Switcher...");
+        {
+            let mut a = app.borrow_mut();
+            a.log("Quitting Mouse Switcher...");
+        }
         std::process::exit(0);
     }
 }
@@ -173,8 +349,14 @@ fn switch_to_profile(app: &Rc<RefCell<App>>, profile: CurrentProfile) {
     };
 
     match apply_settings(&profile_config.clone().into()) {
-        Ok(()) => println!("Switched to {} profile", profile.label()),
-        Err(e) => eprintln!("Failed to apply {} profile: {}", profile.label(), e),
+        Ok(()) => {
+            let mut a = app.borrow_mut();
+            a.log(&format!("Switched to {} profile", profile.label()));
+        }
+        Err(e) => {
+            let mut a = app.borrow_mut();
+            a.log(&format!("Failed to apply {} profile: {}", profile.label(), e));
+        }
     }
 
     app.borrow_mut().profile = profile;
@@ -197,8 +379,14 @@ fn do_change_speed(app: &Rc<RefCell<App>>, delta: i32) {
     prof.speed = new_speed;
 
     match apply_settings(&prof.clone().into()) {
-        Ok(()) => println!("Speed changed to {}", new_speed),
-        Err(e) => eprintln!("Failed to change speed: {}", e),
+        Ok(()) => {
+            let mut a = app.borrow_mut();
+            a.log(&format!("Speed changed to {}", new_speed));
+        }
+        Err(e) => {
+            let mut a = app.borrow_mut();
+            a.log(&format!("Failed to change speed: {}", e));
+        }
     }
 
     {
@@ -208,7 +396,7 @@ fn do_change_speed(app: &Rc<RefCell<App>>, delta: i32) {
             CurrentProfile::Gaming => a.config.gaming = prof,
         }
         if let Err(e) = a.config.save() {
-            eprintln!("Failed to save config: {}", e);
+            a.log(&format!("Failed to save config: {}", e));
         }
     }
 
@@ -226,11 +414,17 @@ fn do_toggle_accel(app: &Rc<RefCell<App>>) {
     prof.enhance_precision = !prof.enhance_precision;
 
     match apply_settings(&prof.clone().into()) {
-        Ok(()) => println!(
-            "Acceleration {}",
-            if prof.enhance_precision { "ON" } else { "OFF" }
-        ),
-        Err(e) => eprintln!("Failed to toggle acceleration: {}", e),
+        Ok(()) => {
+            let mut a = app.borrow_mut();
+            a.log(&format!(
+                "Acceleration {}",
+                if prof.enhance_precision { "ON" } else { "OFF" }
+            ));
+        }
+        Err(e) => {
+            let mut a = app.borrow_mut();
+            a.log(&format!("Failed to toggle acceleration: {}", e));
+        }
     }
 
     {
@@ -240,7 +434,7 @@ fn do_toggle_accel(app: &Rc<RefCell<App>>) {
             CurrentProfile::Gaming => a.config.gaming = prof,
         }
         if let Err(e) = a.config.save() {
-            eprintln!("Failed to save config: {}", e);
+            a.log(&format!("Failed to save config: {}", e));
         }
     }
 
