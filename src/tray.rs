@@ -6,6 +6,10 @@ use tray_icon::{
 
 const MENU_ID_NORMAL: &str = "normal";
 const MENU_ID_GAMING: &str = "gaming";
+const MENU_ID_SPEED_DISPLAY: &str = "speed_display";
+const MENU_ID_SPEED_UP: &str = "speed_up";
+const MENU_ID_SPEED_DOWN: &str = "speed_down";
+const MENU_ID_ACCEL_TOGGLE: &str = "accel_toggle";
 const MENU_ID_TOGGLE: &str = "toggle";
 const MENU_ID_OPEN_CONFIG: &str = "open_config";
 const MENU_ID_QUIT: &str = "quit";
@@ -36,28 +40,38 @@ pub struct AppTray {
     pub tray: TrayIcon,
     pub menu_normal: CheckMenuItem,
     pub menu_gaming: CheckMenuItem,
+    pub speed_display: MenuItem,
+    pub speed_up: MenuItem,
+    pub speed_down: MenuItem,
+    pub accel_toggle: CheckMenuItem,
 }
 
 pub fn build_tray() -> Result<AppTray, String> {
     let icon = create_icon();
 
-    let menu_normal =
-        CheckMenuItem::with_id(MENU_ID_NORMAL, "Normal", true, true, None);
-    let menu_gaming =
-        CheckMenuItem::with_id(MENU_ID_GAMING, "Gaming", true, false, None);
-    let toggle =
-        MenuItem::with_id(MENU_ID_TOGGLE, "Toggle Profile", true, None);
-    let open_config =
-        MenuItem::with_id(MENU_ID_OPEN_CONFIG, "Open Settings", true, None);
-    let quit =
-        MenuItem::with_id(MENU_ID_QUIT, "Quit", true, None);
+    let menu_normal = CheckMenuItem::with_id(MENU_ID_NORMAL, "Normal", true, true, None);
+    let menu_gaming = CheckMenuItem::with_id(MENU_ID_GAMING, "Gaming", true, false, None);
+    let separator1 = PredefinedMenuItem::separator();
+    let speed_display = MenuItem::with_id(MENU_ID_SPEED_DISPLAY, "Speed: 10", false, None);
+    let speed_up = MenuItem::with_id(MENU_ID_SPEED_UP, "  Speed ▲  (+1)", true, None);
+    let speed_down = MenuItem::with_id(MENU_ID_SPEED_DOWN, "  Speed ▼  (-1)", true, None);
+    let accel_toggle =
+        CheckMenuItem::with_id(MENU_ID_ACCEL_TOGGLE, "Acceleration: ON", true, true, None);
+    let separator2 = PredefinedMenuItem::separator();
+    let toggle = MenuItem::with_id(MENU_ID_TOGGLE, "Toggle Profile", true, None);
+    let open_config = MenuItem::with_id(MENU_ID_OPEN_CONFIG, "Open Settings", true, None);
+    let quit = MenuItem::with_id(MENU_ID_QUIT, "Quit", true, None);
 
     let tray_menu = Menu::new();
     tray_menu.append(&menu_normal).map_err(|e| format!("Menu error: {e}"))?;
     tray_menu.append(&menu_gaming).map_err(|e| format!("Menu error: {e}"))?;
-    tray_menu.append(&PredefinedMenuItem::separator()).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&separator1).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&speed_display).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&speed_up).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&speed_down).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&accel_toggle).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&separator2).map_err(|e| format!("Menu error: {e}"))?;
     tray_menu.append(&toggle).map_err(|e| format!("Menu error: {e}"))?;
-    tray_menu.append(&PredefinedMenuItem::separator()).map_err(|e| format!("Menu error: {e}"))?;
     tray_menu.append(&open_config).map_err(|e| format!("Menu error: {e}"))?;
     tray_menu.append(&quit).map_err(|e| format!("Menu error: {e}"))?;
 
@@ -72,16 +86,33 @@ pub fn build_tray() -> Result<AppTray, String> {
         tray,
         menu_normal,
         menu_gaming,
+        speed_display,
+        speed_up,
+        speed_down,
+        accel_toggle,
     })
 }
 
-pub fn update_tray_ui(tray: &AppTray, profile: CurrentProfile) {
+pub fn update_tray_ui(tray: &AppTray, profile: CurrentProfile, speed: u32, accel: bool) {
     tray.tray.set_tooltip(Some(&format!(
-        "Mouse Switcher - {}",
-        profile.label()
+        "Mouse Switcher - {} (Speed: {})",
+        profile.label(),
+        speed
     )));
     tray.menu_normal.set_checked(profile == CurrentProfile::Normal);
     tray.menu_gaming.set_checked(profile == CurrentProfile::Gaming);
+    tray.speed_display.set_text(&format!("Speed: {}", speed));
+    tray.accel_toggle.set_checked(accel);
+    tray.accel_toggle.set_text(if accel {
+        "Acceleration: ON"
+    } else {
+        "Acceleration: OFF"
+    });
+
+    let can_decrease = speed > 1;
+    let can_increase = speed < 20;
+    tray.speed_down.set_enabled(can_decrease);
+    tray.speed_up.set_enabled(can_increase);
 }
 
 fn create_icon() -> Icon {
@@ -127,6 +158,18 @@ pub fn menu_id_to_profile(id: &MenuId) -> Option<CurrentProfile> {
         MENU_ID_GAMING => Some(CurrentProfile::Gaming),
         _ => None,
     }
+}
+
+pub fn is_speed_up(id: &MenuId) -> bool {
+    id.as_ref() == MENU_ID_SPEED_UP
+}
+
+pub fn is_speed_down(id: &MenuId) -> bool {
+    id.as_ref() == MENU_ID_SPEED_DOWN
+}
+
+pub fn is_accel_toggle(id: &MenuId) -> bool {
+    id.as_ref() == MENU_ID_ACCEL_TOGGLE
 }
 
 pub fn is_toggle(id: &MenuId) -> bool {

@@ -11,6 +11,8 @@ pub struct Profile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HotkeyConfig {
     pub toggle: String,
+    pub speed_up: String,
+    pub speed_down: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +35,8 @@ impl Config {
             },
             hotkey: HotkeyConfig {
                 toggle: "Ctrl+Alt+M".to_string(),
+                speed_up: "Ctrl+Alt+ArrowUp".to_string(),
+                speed_down: "Ctrl+Alt+ArrowDown".to_string(),
             },
         }
     }

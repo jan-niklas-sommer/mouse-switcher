@@ -1,25 +1,62 @@
 # Mouse Switcher
 
-Lightweight Windows system-tray app to quickly switch mouse sensitivity between normal and gaming profiles. Single `.exe`, no installation, no dependencies.
+Lightweight Windows system-tray app to quickly switch and adjust mouse sensitivity between normal and gaming profiles. Single `.exe`, no installation, no dependencies.
 
 ## Features
 
 - **Two profiles**: Normal (default Windows speed) and Gaming (lower speed, no acceleration)
-- **System tray icon** with right-click menu to switch profiles
-- **Global hotkey** (`Ctrl+Alt+M`) to toggle between profiles instantly
-- **Configurable** via `settings.toml` next to the `.exe`
-- **Single binary** — just download and run
+- **In-game hotkeys**: Adjust sensitivity without leaving your game
+- **System tray icon** with right-click menu for full control
+- **Speed adjustment**: +1 / -1 steps via hotkey or tray menu (range 1-20)
+- **Acceleration toggle**: Enable/disable "Enhance Pointer Precision" per profile
+- **Auto-save**: All changes are saved to `settings.toml` instantly
+- **Single binary** — just download and run, no installer needed
 
-## Usage
+## Quick Start
 
-1. Download the latest release ZIP
+1. Download the latest release ZIP from [Releases](https://github.com/jan-niklas-sommer/mouse-switcher/releases)
 2. Extract `mouse-switcher.exe` and `settings.toml` to any folder
 3. Run `mouse-switcher.exe`
-4. Use `Ctrl+Alt+M` or right-click the tray icon to switch profiles
+4. Use hotkeys or right-click the tray icon to control
+
+## Hotkeys
+
+All hotkeys work globally, even when a game is in the foreground.
+
+| Action | Default Hotkey |
+|--------|---------------|
+| Toggle Normal / Gaming profile | `Ctrl+Alt+M` |
+| Increase mouse speed (+1) | `Ctrl+Alt+ArrowUp` |
+| Decrease mouse speed (-1) | `Ctrl+Alt+ArrowDown` |
+
+## Tray Menu
+
+Right-click the tray icon for full control:
+
+```
+┌──────────────────────────────┐
+│ ✓ Normal                     │  ← Switch to Normal profile
+│   Gaming                     │  ← Switch to Gaming profile
+│ ─────────────────────────────│
+│   Speed: 10                  │  ← Current speed (info only)
+│   Speed ▲  (+1)              │  ← Increase speed
+│   Speed ▼  (-1)              │  ← Decrease speed
+│ ✓ Acceleration: ON           │  ← Toggle mouse acceleration
+│ ─────────────────────────────│
+│   Toggle Profile             │  ← Quick toggle
+│   Open Settings              │  ← Edit settings.toml in Notepad
+│   Quit                       │
+└──────────────────────────────┘
+```
+
+- **Speed ▲/▼** and **Acceleration** only affect the currently active profile
+- Speed is clamped to range **1-20** (1 = slowest, 10 = Windows default, 20 = fastest)
+- Speed ▲ is disabled at 20, Speed ▼ is disabled at 1
+- All changes are auto-saved to `settings.toml`
 
 ## Configuration
 
-Edit `settings.toml` (right-click tray icon → Open Settings):
+Edit `settings.toml` (right-click tray → Open Settings, or edit manually):
 
 ```toml
 [normal]
@@ -27,11 +64,13 @@ speed = 10                    # 1-20, Windows default is 10
 enhance_precision = true      # Mouse acceleration ON
 
 [gaming]
-speed = 4                     # Lower = slower mouse
-enhance_precision = false     # Mouse acceleration OFF (better for gaming)
+speed = 4                     # Lower = slower, better for FPS/aiming
+enhance_precision = false     # Mouse acceleration OFF (raw input)
 
 [hotkey]
-toggle = "Ctrl+Alt+M"        # Hotkey to toggle profiles
+toggle = "Ctrl+Alt+M"
+speed_up = "Ctrl+Alt+ArrowUp"
+speed_down = "Ctrl+Alt+ArrowDown"
 ```
 
 ### Mouse Speed Values
@@ -39,26 +78,56 @@ toggle = "Ctrl+Alt+M"        # Hotkey to toggle profiles
 | Value | Description |
 |-------|-------------|
 | 1     | Slowest |
+| 4-6   | Typical gaming range |
 | 10    | Windows default |
 | 20    | Fastest |
 
+### Mouse Acceleration ("Enhance Pointer Precision")
+
+- **ON** (Normal): Windows moves the cursor faster when you move the mouse quickly. Good for desktop use.
+- **OFF** (Gaming): 1:1 mouse movement — cursor distance is proportional to physical mouse movement. Essential for consistent aiming in FPS games.
+
 ### Hotkey Format
 
-Use modifier keys + a key: `Ctrl+Alt+M`, `Ctrl+Shift+1`, `Alt+G`, etc.
+Hotkeys use modifier keys + a key. Examples:
+- `Ctrl+Alt+M`
+- `Ctrl+Shift+1`
+- `Alt+G`
+- `Ctrl+Alt+ArrowUp` / `Ctrl+Alt+ArrowDown`
+
+Supported modifiers: `Ctrl`, `Alt`, `Shift`, `Super`
 
 ## Autostart (optional)
 
-Create a shortcut to `mouse-switcher.exe` in your Windows Startup folder:
+To start Mouse Switcher automatically with Windows:
+
 1. Press `Win+R`, type `shell:startup`, press Enter
 2. Create a shortcut to `mouse-switcher.exe` in that folder
 
+## How it works
+
+Mouse Switcher uses the Windows `SystemParametersInfoW` API to change:
+- **Mouse speed** (`SPI_SETMOUSESPEED`): Changes the pointer speed slider value (1-20)
+- **Mouse acceleration** (`SPI_SETMOUSE`): Toggles the "Enhance pointer precision" checkbox
+
+These are the same settings found in Windows Settings → Mouse → Additional mouse settings → Pointer Options.
+
 ## Building from source
+
+Requires Rust and Visual Studio Build Tools (MSVC).
 
 ```bash
 cargo build --release
 ```
 
-Requires Rust and the MSVC build tools (Visual Studio Build Tools).
+The `.exe` will be at `target/release/mouse-switcher.exe`.
+
+## Tech Stack
+
+- **Rust** — compiled to a single static binary (~1-3 MB)
+- **Windows API** — `SystemParametersInfoW` for mouse settings
+- **tray-icon** — system tray with native Windows menu
+- **global-hotkey** — system-wide hotkey registration
 
 ## License
 
