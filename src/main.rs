@@ -23,9 +23,9 @@ struct App {
     profile: CurrentProfile,
     config: Config,
     tray: AppTray,
-    hotkey_toggle: global_hotkey::hotkey::HotKey,
-    hotkey_speed_up: global_hotkey::hotkey::HotKey,
-    hotkey_speed_down: global_hotkey::hotkey::HotKey,
+    hotkey_toggle_id: u32,
+    hotkey_speed_up_id: u32,
+    hotkey_speed_down_id: u32,
 }
 
 fn main() {
@@ -45,6 +45,10 @@ fn main() {
     let hotkey_speed_down = global_hotkey::hotkey::HotKey::from_str(&config.hotkey.speed_down)
         .expect("Failed to parse speed_down hotkey");
 
+    let hotkey_toggle_id = hotkey_toggle.id();
+    let hotkey_speed_up_id = hotkey_speed_up.id();
+    let hotkey_speed_down_id = hotkey_speed_down.id();
+
     hotkey_manager.register(hotkey_toggle).expect("Failed to register toggle hotkey");
     hotkey_manager.register(hotkey_speed_up).expect("Failed to register speed_up hotkey");
     hotkey_manager.register(hotkey_speed_down).expect("Failed to register speed_down hotkey");
@@ -60,15 +64,18 @@ fn main() {
         profile: CurrentProfile::Normal,
         config,
         tray: app_tray,
-        hotkey_toggle,
-        hotkey_speed_up,
-        hotkey_speed_down,
+        hotkey_toggle_id,
+        hotkey_speed_up_id,
+        hotkey_speed_down_id,
     }));
 
     println!("Mouse Switcher started.");
-    println!("  Toggle: {}", app.borrow().config.hotkey.toggle);
-    println!("  Speed Up: {}", app.borrow().config.hotkey.speed_up);
-    println!("  Speed Down: {}", app.borrow().config.hotkey.speed_down);
+    {
+        let a = app.borrow();
+        println!("  Toggle: {}", a.config.hotkey.toggle);
+        println!("  Speed Up: {}", a.config.hotkey.speed_up);
+        println!("  Speed Down: {}", a.config.hotkey.speed_down);
+    }
 
     let hotkey_rx = global_hotkey::GlobalHotKeyEvent::receiver();
     let menu_rx = tray_icon::menu::MenuEvent::receiver();
@@ -100,13 +107,13 @@ fn refresh_ui(app: &Rc<RefCell<App>>) {
     tray::update_tray_ui(&a.tray, a.profile, speed, accel);
 }
 
-fn handle_hotkey(app: &Rc<RefCell<App>>, hotkey_id: global_hotkey::hotkey::HotKey) {
+fn handle_hotkey(app: &Rc<RefCell<App>>, hotkey_id: u32) {
     let (is_toggle, is_up, is_down) = {
         let a = app.borrow();
         (
-            hotkey_id == a.hotkey_toggle,
-            hotkey_id == a.hotkey_speed_up,
-            hotkey_id == a.hotkey_speed_down,
+            hotkey_id == a.hotkey_toggle_id,
+            hotkey_id == a.hotkey_speed_up_id,
+            hotkey_id == a.hotkey_speed_down_id,
         )
     };
 
