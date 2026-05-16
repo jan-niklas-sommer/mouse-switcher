@@ -2,12 +2,12 @@ mod config;
 mod mouse;
 mod tray;
 
+use std::cell::Cell;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
 
 use config::Config;
 use mouse::{apply_settings, MouseSettings};
-use tray::{AppState, CurrentProfile};
+use tray::{AppTray, CurrentProfile};
 
 impl From<config::Profile> for MouseSettings {
     fn from(p: config::Profile) -> Self {
@@ -23,13 +23,7 @@ fn main() {
 
     apply_settings(&config.normal.clone().into()).expect("Failed to apply initial profile");
 
-    let app_icon = tray::build_tray().expect("Failed to create tray icon");
-
-    let state = Arc::new(Mutex::new(AppState {
-        current_profile: CurrentProfile::Normal,
-        config: config.clone(),
-        icon: app_icon,
-    }));
+    let app_tray = tray::build_tray().expect("Failed to create tray icon");
 
     let hotkey_manager =
         global_hotkey::GlobalHotKeyManager::new().expect("Failed to create hotkey manager");
@@ -42,6 +36,8 @@ fn main() {
     let hotkey_rx = global_hotkey::GlobalHotKeyEvent::receiver();
     let menu_rx = tray_icon::menu::MenuEvent::receiver();
 
+    let current_profile = Cell::new(CurrentProfile::Normal);
+
     println!("Mouse Switcher started. Hotkey: {}", config.hotkey.toggle);
 
     loop {
@@ -49,56 +45,61 @@ fn main() {
             recv(hotkey_rx) -> event => {
                 if let Ok(event) = event {
                     if event.state == global_hotkey::HotKeyState::Pressed {
-                        toggle_profile(&state);
+                        do_toggle(&app_tray, &config, &current_profile);
                     }
                 }
             }
             recv(menu_rx) -> event => {
                 if let Ok(event) = event {
-                    handle_menu_event(&state, event);
+                    handle_menu_event(&app_tray, &config, &current_profile, event);
                 }
             }
         }
     }
 }
 
-fn switch_to_profile(state: &Arc<Mutex<AppState>>, profile: CurrentProfile) {
-    let mut s = state.lock().unwrap();
-    if s.current_profile == profile {
+fn do_toggle(tray: &AppTray, config: &Config, current: &Cell<CurrentProfile>) {
+    let next = match current.get() {
+        CurrentProfile::Normal => CurrentProfile::Gaming,
+        CurrentProfile::Gaming => CurrentProfile::Normal,
+    };
+    switch_to_profile(tray, config, current, next);
+}
+
+fn switch_to_profile(
+    tray: &AppTray,
+    config: &Config,
+    current: &Cell<CurrentProfile>,
+    profile: CurrentProfile,
+) {
+    if current.get() == profile {
         return;
     }
+
     let profile_config = match profile {
-        CurrentProfile::Normal => s.config.normal.clone(),
-        CurrentProfile::Gaming => s.config.gaming.clone(),
+        CurrentProfile::Normal => config.normal.clone(),
+        CurrentProfile::Gaming => config.gaming.clone(),
     };
-    s.current_profile = profile;
-    let label = profile.label().to_string();
-    drop(s);
 
     match apply_settings(&profile_config.into()) {
-        Ok(()) => println!("Switched to {} profile", label),
-        Err(e) => eprintln!("Failed to apply {} profile: {}", label, e),
+        Ok(()) => println!("Switched to {} profile", profile.label()),
+        Err(e) => eprintln!("Failed to apply {} profile: {}", profile.label(), e),
     }
 
-    tray::update_tray_ui(state);
+    current.set(profile);
+    tray::update_tray_ui(tray, profile);
 }
 
-fn toggle_profile(state: &Arc<Mutex<AppState>>) {
-    let next = {
-        let s = state.lock().unwrap();
-        match s.current_profile {
-            CurrentProfile::Normal => CurrentProfile::Gaming,
-            CurrentProfile::Gaming => CurrentProfile::Normal,
-        }
-    };
-    switch_to_profile(state, next);
-}
-
-fn handle_menu_event(state: &Arc<Mutex<AppState>>, event: tray_icon::menu::MenuEvent) {
+fn handle_menu_event(
+    tray: &AppTray,
+    config: &Config,
+    current: &Cell<CurrentProfile>,
+    event: tray_icon::menu::MenuEvent,
+) {
     if tray::is_toggle(&event.id) {
-        toggle_profile(state);
+        do_toggle(tray, config, current);
     } else if let Some(profile) = tray::menu_id_to_profile(&event.id) {
-        switch_to_profile(state, profile);
+        switch_to_profile(tray, config, current, profile);
     } else if tray::is_open_config(&event.id) {
         tray::open_config_file();
     } else if tray::is_quit(&event.id) {

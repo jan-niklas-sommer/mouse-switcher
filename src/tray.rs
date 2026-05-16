@@ -1,8 +1,7 @@
 use crate::config::Config;
-use std::sync::{Arc, Mutex};
 use tray_icon::{
-    menu::{Check, Menu, MenuId, MenuItem, PredefinedMenuItem},
-    Icon, TrayIconBuilder,
+    menu::{CheckMenuItem, Menu, MenuId, MenuItem, PredefinedMenuItem},
+    Icon, TrayIcon, TrayIconBuilder,
 };
 
 const MENU_ID_NORMAL: &str = "normal";
@@ -33,26 +32,25 @@ impl CurrentProfile {
     }
 }
 
-pub struct AppIcon {
-    pub tray: tray_icon::TrayIcon,
-    pub menu_normal: Check<()>,
-    pub menu_gaming: Check<()>,
+pub struct AppTray {
+    pub tray: TrayIcon,
+    pub menu_normal: CheckMenuItem,
+    pub menu_gaming: CheckMenuItem,
 }
 
-pub struct AppState {
-    pub current_profile: CurrentProfile,
-    pub config: Config,
-    pub icon: AppIcon,
-}
-
-pub fn build_tray() -> Result<AppIcon, String> {
+pub fn build_tray() -> Result<AppTray, String> {
     let icon = create_icon();
 
-    let menu_normal = Check::with_id(MENU_ID_NORMAL, true, "Normal", true, None);
-    let menu_gaming = Check::with_id(MENU_ID_GAMING, false, "Gaming", true, None);
-    let toggle = MenuItem::with_id(MENU_ID_TOGGLE, "Toggle Profile", true, None);
-    let open_config = MenuItem::with_id(MENU_ID_OPEN_CONFIG, "Open Settings", true, None);
-    let quit = MenuItem::with_id(MENU_ID_QUIT, "Quit", true, None);
+    let menu_normal =
+        CheckMenuItem::with_id(MENU_ID_NORMAL, "Normal", true, true, None);
+    let menu_gaming =
+        CheckMenuItem::with_id(MENU_ID_GAMING, "Gaming", true, false, None);
+    let toggle =
+        MenuItem::with_id(MENU_ID_TOGGLE, "Toggle Profile", true, None);
+    let open_config =
+        MenuItem::with_id(MENU_ID_OPEN_CONFIG, "Open Settings", true, None);
+    let quit =
+        MenuItem::with_id(MENU_ID_QUIT, "Quit", true, None);
 
     let tray_menu = Menu::new();
     tray_menu.append(&menu_normal).map_err(|e| format!("Menu error: {e}"))?;
@@ -70,22 +68,20 @@ pub fn build_tray() -> Result<AppIcon, String> {
         .build()
         .map_err(|e| format!("Tray error: {e}"))?;
 
-    Ok(AppIcon {
+    Ok(AppTray {
         tray,
         menu_normal,
         menu_gaming,
     })
 }
 
-pub fn update_tray_ui(state: &Arc<Mutex<AppState>>) {
-    let s = state.lock().unwrap();
-    let profile = s.current_profile;
-    s.icon.tray.set_tooltip(Some(&format!(
+pub fn update_tray_ui(tray: &AppTray, profile: CurrentProfile) {
+    tray.tray.set_tooltip(Some(&format!(
         "Mouse Switcher - {}",
         profile.label()
     )));
-    let _ = s.icon.menu_normal.set_checked(profile == CurrentProfile::Normal);
-    let _ = s.icon.menu_gaming.set_checked(profile == CurrentProfile::Gaming);
+    tray.menu_normal.set_checked(profile == CurrentProfile::Normal);
+    tray.menu_gaming.set_checked(profile == CurrentProfile::Gaming);
 }
 
 fn create_icon() -> Icon {
