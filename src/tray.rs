@@ -2,7 +2,7 @@ use crate::config::Config;
 use std::sync::{Arc, Mutex};
 use tray_icon::{
     menu::{Check, Menu, MenuId, MenuItem, PredefinedMenuItem},
-    TrayIcon, TrayIconBuilder,
+    Icon, TrayIconBuilder,
 };
 
 const MENU_ID_NORMAL: &str = "normal";
@@ -29,12 +29,12 @@ impl CurrentProfile {
         *self = match self {
             CurrentProfile::Normal => CurrentProfile::Gaming,
             CurrentProfile::Gaming => CurrentProfile::Normal,
-        };
+        }
     }
 }
 
 pub struct AppIcon {
-    pub tray: TrayIcon,
+    pub tray: tray_icon::TrayIcon,
     pub menu_normal: Check<()>,
     pub menu_gaming: Check<()>,
 }
@@ -45,47 +45,28 @@ pub struct AppState {
     pub icon: AppIcon,
 }
 
-pub fn build_tray(config: &Config) -> Result<AppIcon, String> {
+pub fn build_tray() -> Result<AppIcon, String> {
     let icon = create_icon();
 
-    let menu_normal =
-        Check::with_id(MENU_ID_NORMAL, true, "Normal", true, None::<&str>);
-    let menu_gaming =
-        Check::with_id(MENU_ID_GAMING, false, "Gaming", true, None::<&str>);
-    let toggle =
-        MenuItem::with_id(MENU_ID_TOGGLE, "Toggle Profile", true, None::<&str>);
-    let open_config =
-        MenuItem::with_id(MENU_ID_OPEN_CONFIG, "Open Settings", true, None::<&str>);
-    let quit =
-        MenuItem::with_id(MENU_ID_QUIT, "Quit", true, None::<&str>);
+    let menu_normal = Check::with_id(MENU_ID_NORMAL, true, "Normal", true, None);
+    let menu_gaming = Check::with_id(MENU_ID_GAMING, false, "Gaming", true, None);
+    let toggle = MenuItem::with_id(MENU_ID_TOGGLE, "Toggle Profile", true, None);
+    let open_config = MenuItem::with_id(MENU_ID_OPEN_CONFIG, "Open Settings", true, None);
+    let quit = MenuItem::with_id(MENU_ID_QUIT, "Quit", true, None);
 
     let tray_menu = Menu::new();
-    tray_menu
-        .append(&menu_normal)
-        .map_err(|e| format!("Menu error: {e}"))?;
-    tray_menu
-        .append(&menu_gaming)
-        .map_err(|e| format!("Menu error: {e}"))?;
-    tray_menu
-        .append(&PredefinedMenuItem::separator())
-        .map_err(|e| format!("Menu error: {e}"))?;
-    tray_menu
-        .append(&toggle)
-        .map_err(|e| format!("Menu error: {e}"))?;
-    tray_menu
-        .append(&PredefinedMenuItem::separator())
-        .map_err(|e| format!("Menu error: {e}"))?;
-    tray_menu
-        .append(&open_config)
-        .map_err(|e| format!("Menu error: {e}"))?;
-    tray_menu
-        .append(&quit)
-        .map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&menu_normal).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&menu_gaming).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&PredefinedMenuItem::separator()).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&toggle).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&PredefinedMenuItem::separator()).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&open_config).map_err(|e| format!("Menu error: {e}"))?;
+    tray_menu.append(&quit).map_err(|e| format!("Menu error: {e}"))?;
 
     let tray = TrayIconBuilder::new()
-        .icon(icon)
-        .tooltip("Mouse Switcher - Normal")
-        .menu(&tray_menu)
+        .with_icon(icon)
+        .with_tooltip("Mouse Switcher - Normal")
+        .with_menu(Box::new(tray_menu))
         .build()
         .map_err(|e| format!("Tray error: {e}"))?;
 
@@ -103,13 +84,13 @@ pub fn update_tray_ui(state: &Arc<Mutex<AppState>>) {
         "Mouse Switcher - {}",
         profile.label()
     )));
-    s.icon.menu_normal.set_checked(profile == CurrentProfile::Normal);
-    s.icon.menu_gaming.set_checked(profile == CurrentProfile::Gaming);
+    let _ = s.icon.menu_normal.set_checked(profile == CurrentProfile::Normal);
+    let _ = s.icon.menu_gaming.set_checked(profile == CurrentProfile::Gaming);
 }
 
-fn create_icon() -> tray_icon::icon::Icon {
+fn create_icon() -> Icon {
     let rgba = generate_icon_data();
-    tray_icon::icon::Icon::from_rgba(rgba, 32, 32).expect("Failed to create icon")
+    Icon::from_rgba(rgba, 32, 32).expect("Failed to create icon")
 }
 
 fn generate_icon_data() -> Vec<u8> {

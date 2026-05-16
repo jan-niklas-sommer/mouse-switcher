@@ -2,7 +2,6 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SystemParametersInfoW, SPI_GETMOUSE, SPI_GETMOUSESPEED, SPI_SETMOUSE, SPI_SETMOUSESPEED,
     SPIF_SENDCHANGE,
 };
-use windows::Win32::Foundation::BOOL;
 
 #[derive(Debug, Clone)]
 pub struct MouseSettings {

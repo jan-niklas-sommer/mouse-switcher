@@ -2,6 +2,7 @@ mod config;
 mod mouse;
 mod tray;
 
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use config::Config;
@@ -22,7 +23,7 @@ fn main() {
 
     apply_settings(&config.normal.clone().into()).expect("Failed to apply initial profile");
 
-    let app_icon = tray::build_tray(&config).expect("Failed to create tray icon");
+    let app_icon = tray::build_tray().expect("Failed to create tray icon");
 
     let state = Arc::new(Mutex::new(AppState {
         current_profile: CurrentProfile::Normal,
@@ -32,7 +33,7 @@ fn main() {
 
     let hotkey_manager =
         global_hotkey::GlobalHotKeyManager::new().expect("Failed to create hotkey manager");
-    let hotkey = global_hotkey::hotkey::HotKey::new_from_str(&config.hotkey.toggle)
+    let hotkey = global_hotkey::hotkey::HotKey::from_str(&config.hotkey.toggle)
         .expect("Failed to parse hotkey. Use format like: Ctrl+Alt+M");
     hotkey_manager
         .register(hotkey)
@@ -47,7 +48,7 @@ fn main() {
         crossbeam_channel::select! {
             recv(hotkey_rx) -> event => {
                 if let Ok(event) = event {
-                    if event.state() == global_hotkey::HotKeyState::Pressed {
+                    if event.state == global_hotkey::HotKeyState::Pressed {
                         toggle_profile(&state);
                     }
                 }
