@@ -55,18 +55,61 @@ fn parse_hotkey(s: &str) -> Option<global_hotkey::hotkey::HotKey> {
     if let Ok(h) = global_hotkey::hotkey::HotKey::from_str(s) {
         return Some(h);
     }
-    let fallback = match s.to_lowercase().as_str() {
-        s if s.contains("arrowup") || s.contains("up") => s
-            .to_lowercase()
-            .replace("arrowup", "Plus")
-            .replace("up", "Plus"),
-        s if s.contains("arrowdown") || s.contains("down") => s
-            .to_lowercase()
-            .replace("arrowdown", "Minus")
-            .replace("down", "Minus"),
-        _ => return None,
-    };
-    global_hotkey::hotkey::HotKey::from_str(&fallback).ok()
+
+    let normalized = normalize_hotkey_str(s);
+    if let Ok(h) = global_hotkey::hotkey::HotKey::from_str(&normalized) {
+        return Some(h);
+    }
+
+    if let Some(ref mut f) = open_log_file() {
+        let _ = writeln!(f, "WARN: Could not parse hotkey '{}' (tried '{}')", s, normalized);
+    }
+    None
+}
+
+fn normalize_hotkey_str(s: &str) -> String {
+    let mut result = s.to_string();
+    let parts: Vec<&str> = result.split('+').collect();
+    if let Some(last) = parts.last() {
+        let key = last.trim();
+        let fixed_key = fix_key_name(key);
+        if fixed_key != key {
+            let mut new_parts = parts.clone();
+            new_parts.pop();
+            new_parts.push(&fixed_key);
+            result = new_parts.join("+");
+        }
+    }
+    result
+}
+
+fn fix_key_name(key: &str) -> String {
+    let lower = key.to_lowercase();
+    if lower.len() == 1 && lower.chars().next().unwrap().is_ascii_alphabetic() {
+        return format!("Key{}", key.to_uppercase());
+    }
+    if lower.len() == 1 && lower.chars().next().unwrap().is_ascii_digit() {
+        return format!("Digit{}", key);
+    }
+    match lower.as_str() {
+        "+" => "Equal".to_string(),
+        "-" => "Minus".to_string(),
+        "up" => "ArrowUp".to_string(),
+        "down" => "ArrowDown".to_string(),
+        "left" => "ArrowLeft".to_string(),
+        "right" => "ArrowRight".to_string(),
+        "space" => "Space".to_string(),
+        "enter" => "Enter".to_string(),
+        "esc" | "escape" => "Escape".to_string(),
+        "tab" => "Tab".to_string(),
+        "backspace" => "Backspace".to_string(),
+        "del" | "delete" => "Delete".to_string(),
+        "pgup" | "pageup" => "PageUp".to_string(),
+        "pgdn" | "pagedown" => "PageDown".to_string(),
+        "home" => "Home".to_string(),
+        "end" => "End".to_string(),
+        _ => key.to_string(),
+    }
 }
 
 fn main() {

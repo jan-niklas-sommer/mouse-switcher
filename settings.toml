@@ -7,6 +7,6 @@ speed = 4
 enhance_precision = false
 
 [hotkey]
-toggle = "Ctrl+Alt+M"
+toggle = "Ctrl+Alt+KeyM"
 speed_up = "Ctrl+Alt+ArrowUp"
 speed_down = "Ctrl+Alt+ArrowDown"

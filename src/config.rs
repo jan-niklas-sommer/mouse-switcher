@@ -34,7 +34,7 @@ impl Config {
                 enhance_precision: false,
             },
             hotkey: HotkeyConfig {
-                toggle: "Ctrl+Alt+M".to_string(),
+                toggle: "Ctrl+Alt+KeyM".to_string(),
                 speed_up: "Ctrl+Alt+ArrowUp".to_string(),
                 speed_down: "Ctrl+Alt+ArrowDown".to_string(),
             },

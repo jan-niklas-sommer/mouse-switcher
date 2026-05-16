@@ -29,6 +29,10 @@ All hotkeys work globally, even when a game is in the foreground.
 | Increase mouse speed (+1) | `Ctrl+Alt+ArrowUp` |
 | Decrease mouse speed (-1) | `Ctrl+Alt+ArrowDown` |
 
+**Note**: In the `settings.toml` config file, key names use the `keyboard-types` format:
+letters are `KeyA`-`KeyZ`, digits are `Digit0`-`Digit9`, arrows are `ArrowUp`/`ArrowDown`/`ArrowLeft`/`ArrowRight`.
+The app auto-normalizes common names (e.g. `M` → `KeyM`, `5` → `Digit5`, `Up` → `ArrowUp`).
+
 ## Tray Menu
 
 Right-click the tray icon for full control:
@@ -68,7 +72,7 @@ speed = 4                     # Lower = slower, better for FPS/aiming
 enhance_precision = false     # Mouse acceleration OFF (raw input)
 
 [hotkey]
-toggle = "Ctrl+Alt+M"
+toggle = "Ctrl+Alt+KeyM"
 speed_up = "Ctrl+Alt+ArrowUp"
 speed_down = "Ctrl+Alt+ArrowDown"
 ```
@@ -89,11 +93,13 @@ speed_down = "Ctrl+Alt+ArrowDown"
 
 ### Hotkey Format
 
-Hotkeys use modifier keys + a key. Examples:
-- `Ctrl+Alt+M`
-- `Ctrl+Shift+1`
-- `Alt+G`
-- `Ctrl+Alt+ArrowUp` / `Ctrl+Alt+ArrowDown`
+Hotkeys use modifier keys + a key name from the [`Code`](https://docs.rs/keyboard-types/latest/keyboard_types/enum.Code.html) enum. Examples:
+- `Ctrl+Alt+KeyM` (letter M)
+- `Ctrl+Shift+Digit1` (number 1)
+- `Alt+KeyG` (letter G)
+- `Ctrl+Alt+ArrowUp` / `Ctrl+Alt+ArrowDown` (arrow keys)
+
+The app auto-normalizes shorthand names: `M` → `KeyM`, `5` → `Digit5`, `Up` → `ArrowUp`, `Space` → `Space`, etc.
 
 Supported modifiers: `Ctrl`, `Alt`, `Shift`, `Super`
 
