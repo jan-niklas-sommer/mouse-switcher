@@ -30,13 +30,17 @@ jobs:
       - name: Build release
         run: cargo build --release
 
+      - name: Prepare release files
+        run: |
+          mkdir release
+          copy target\release\mouse-switcher.exe release\
+          copy settings.toml release\
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: mouse-switcher
-          path: |
-            target/release/mouse-switcher.exe
-            settings.toml
+          path: release/
 
   release:
     needs: build
@@ -57,6 +61,7 @@ jobs:
       - name: Create ZIP
         run: |
           cd release
+          ls -la
           zip ../mouse-switcher-${{ github.ref_name }}.zip mouse-switcher.exe settings.toml
 
       - name: Create Release
